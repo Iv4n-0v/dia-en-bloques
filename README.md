@@ -12,7 +12,7 @@ Todo corre en Firebase (plan Spark, gratis): Authentication para Google, Firesto
 - `firestore.rules`: reglas para que cada persona solo vea sus propios datos.
 - `firebase.json` y `.firebaserc`: configuración para publicar con la terminal.
 
-La página queda en `https://TU-PROYECTO-ID.web.app`. Cualquiera con una cuenta de Google puede entrar.
+La página queda en `https://dia-en-bloques.web.app`. Cualquiera con una cuenta de Google puede entrar.
 
 
 ## Cómo funciona la racha

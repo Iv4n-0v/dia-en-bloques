@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Cada estudiante solo puede leer y escribir sus propios datos.
+    match /users/{uid}/data/planner {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['tasks'])
+        && request.resource.data.tasks is list;
+    }
+    match /users/{uid}/data/streak {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['cur', 'best', 'last', 'days'])
+        && request.resource.data.days is list;
+    }
+  }
+}

@@ -22,6 +22,19 @@ La página queda en `https://dia-en-bloques.web.app`. Cualquiera con una cuenta 
 - El día se mide con la fecha del dispositivo de cada persona.
 - Las actividades de ejemplo que trae la página no cuentan.
 
+## Organizar mi día
+
+En el panel "Por organizar" agregas actividades con duración, prioridad, tipo y fecha límite opcional (sin hora). El botón "Organizar mi día" las reparte en las horas libres del día que estás viendo, entre las 06:00 y las 22:00:
+
+- Primero van las de mayor prioridad. Una fecha límite cercana (hoy o en 2 días) sube la prioridad.
+- Con la misma prioridad se alternan académicas y personales.
+- Después de 3 horas seguidas deja una hora libre de descanso.
+- Si una actividad no cabe de una vez, la parte en bloques de hasta 2 horas. Lo que no cabe queda en la lista para otro día.
+- Si es hoy, solo usa horas que aún no han pasado.
+- Organizar no suma racha; la racha sube cuando creas o completas una actividad.
+
+La lista se guarda junto a las actividades en `users/{id}/data/planner` (campo `pending`), por eso `firestore.rules` permite ese campo. Después de actualizar el repo hay que publicar las reglas: `firebase deploy --only firestore:rules`.
+
 ## Privacidad y seguridad
 
 - Cada estudiante guarda sus datos en `users/{su id}/data/`. Las reglas de `firestore.rules` impiden que otra persona los lea o los cambie.

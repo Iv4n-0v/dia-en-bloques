@@ -107,6 +107,16 @@ h1{font:700 clamp(28px,6vw,42px)/1.05 var(--f-display);letter-spacing:-.025em}
 .timeline{display:grid;gap:10px;min-width:0}
 .hint{color:var(--muted);font-size:13.5px}
 .exnote{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 12px;border-radius:12px;background:var(--surface2);font-size:13.5px}
+/* Por organizar */
+.pform{display:grid;gap:8px}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.plist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.plist li{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface2)}
+.plist .pdot{flex:none;width:12px;height:12px;border-radius:50%}
+.plist .ptx{flex:1;min-width:0;display:grid;gap:2px}
+.plist .ptx strong{overflow-wrap:anywhere}
+.plist .btn{flex:none}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 .warn{padding:10px 12px;border-radius:12px;border:1px solid var(--danger);color:var(--danger);font-size:13.5px}
 .grid{position:relative}
 .slots{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
@@ -148,7 +158,7 @@ body.selecting .card{pointer-events:none}
 .edhead h2,.idle h2{font:700 22px/1.1 var(--f-display);letter-spacing:-.015em}
 .field{display:grid;gap:6px;min-width:0;border:0;padding:0;margin:0}
 .field>label,.field>legend{padding:0;font-size:13px;font-weight:600}
-input[type="text"],select,textarea{width:100%;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);font-size:16px}
+input[type="text"],input[type="date"],select,textarea{width:100%;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);font-size:16px}
 textarea{resize:vertical;min-height:70px}
 input[type="text"]:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .times{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -413,6 +423,31 @@ input[type="text"]:focus-visible,select:focus-visible,textarea:focus-visible{out
       <div class="scale" aria-hidden="true"></div>
       <div class="scale-l"><span>Urgente, hazlo ya</span><span>Relajada, sin presión</span></div>
     </div>
+    <div class="panel" id="plan">
+      <div class="panel-h"><span>Por organizar</span><span class="muted" id="planNote"></span></div>
+      <form class="pform" id="pf" novalidate>
+        <input type="text" id="pt" maxlength="80" autocomplete="off" placeholder="Ej. Taller de Física" aria-label="Actividad por organizar">
+        <div class="pgrid">
+          <select id="pd" aria-label="Duración">
+            <option value="1">1 hora</option><option value="2" selected>2 horas</option>
+            <option value="3">3 horas</option><option value="4">4 horas</option>
+          </select>
+          <select id="pp" aria-label="Prioridad">
+            <option value="1">Crítica</option><option value="2">Alta</option>
+            <option value="3" selected>Media</option><option value="4">Baja</option>
+            <option value="5">Relajada</option>
+          </select>
+          <select id="pc" aria-label="Tipo">
+            <option value="acad" selected>Académica</option><option value="pers">Personal</option>
+          </select>
+          <input type="date" id="pdue" aria-label="Fecha límite (opcional)">
+        </div>
+        <button type="submit" class="btn small">Agregar a la lista</button>
+      </form>
+      <ul class="plist" id="plist"></ul>
+      <button type="button" class="btn primary" id="orgBtn" disabled>Organizar mi día</button>
+      <p class="muted small" id="orgMsg" role="status" aria-live="polite"></p>
+    </div>
   </section>
 
   <section class="timeline" aria-label="Horas del día">
@@ -595,8 +630,14 @@ function cleanTasks(o){
   return a.filter(t=>t&&typeof t.title==='string'&&DRE.test(t.date||'')&&Number.isInteger(t.start)&&Number.isInteger(t.end)&&t.start>=0&&t.end<=24&&t.end>t.start&&PR[t.pr]&&CAT[t.cat])
     .map(t=>({id:String(t.id||uid()),date:t.date,start:t.start,end:t.end,title:t.title.slice(0,80),notes:typeof t.notes==='string'?t.notes.slice(0,240):'',cat:t.cat,pr:t.pr,done:!!t.done,ex:!!t.ex}));
 }
+function cleanPending(o){
+  const a=o&&Array.isArray(o.pending)?o.pending:[];
+  return a.filter(p=>p&&typeof p.title==='string'&&p.title.trim()&&Number.isInteger(p.dur)&&p.dur>=1&&p.dur<=8&&PR[p.pr]&&CAT[p.cat])
+    .slice(0,40)
+    .map(p=>({id:String(p.id||uid()),title:p.title.slice(0,80),dur:p.dur,pr:p.pr,cat:p.cat,due:typeof p.due==='string'&&DRE.test(p.due)?p.due:''}));
+}
 
-const S={date:todayKey(),tasks:[],streak:{cur:0,best:0,last:'',days:[]},sync:{t:'',s:''}};
+const S={date:todayKey(),tasks:[],pending:[],streak:{cur:0,best:0,last:'',days:[]},sync:{t:'',s:''}};
 const A={status:'checking',id:null,name:'',avatar:'',db:null,mode:null,unsub:[],busy:false,err:'',refT:null,refS:null};
 const E={id:null};
 
@@ -626,8 +667,8 @@ function pruneTasks(){
   }
 }
 function save(){
-  if(A.mode==='cloud'){pruneTasks();cloudPut('t',A.refT,{tasks:S.tasks},'t');}
-  else{$('storeWarn').hidden=lwrite(LKEY,{tasks:S.tasks});}
+  if(A.mode==='cloud'){pruneTasks();cloudPut('t',A.refT,{tasks:S.tasks,pending:S.pending},'t');}
+  else{$('storeWarn').hidden=lwrite(LKEY,{tasks:S.tasks,pending:S.pending});}
 }
 function saveStreak(){
   if(A.mode==='cloud')cloudPut('s',A.refS,S.streak,'s');
@@ -736,6 +777,7 @@ function enterLocal(){
   A.mode='local';
   const o=lread(LKEY),t=o?cleanTasks(o):[];
   S.tasks=o&&Array.isArray(o.tasks)?t:seed(todayKey());
+  S.pending=cleanPending(o);
   S.streak=cleanStreak(lread(SKEY));
   S.date=todayKey();
   lwrite(MKEY,'local');
@@ -746,7 +788,7 @@ function subscribe(){
     if(snap.metadata.hasPendingWrites||!snap.exists)return;
     const d=snap.data(),c=canon(d);
     if(c===S.sync.t)return;
-    S.sync.t=c;S.tasks=cleanTasks(d);
+    S.sync.t=c;S.tasks=cleanTasks(d);S.pending=cleanPending(d);
     if(E.id&&!S.tasks.some(t=>t.id===E.id))closeEditor();
     render();
   },()=>{}));
@@ -770,8 +812,8 @@ async function enterCloud(){
     A.unsub.forEach(f=>{try{f();}catch(e){}});A.unsub=[];
     A.refT=refT;A.refS=refS;A.mode='cloud';
     let migT=false,migS=false;
-    if(t.exists){S.sync.t=canon(t.data());S.tasks=cleanTasks(t.data());}
-    else{S.sync.t='';migT=!!(loc&&Array.isArray(loc.tasks)&&loc.tasks.length);S.tasks=migT?cleanTasks(loc):seed(todayKey());}
+    if(t.exists){S.sync.t=canon(t.data());S.tasks=cleanTasks(t.data());S.pending=cleanPending(t.data());}
+    else{S.sync.t='';migT=!!(loc&&Array.isArray(loc.tasks)&&loc.tasks.length);S.tasks=migT?cleanTasks(loc):seed(todayKey());S.pending=migT?cleanPending(loc):[];}
     if(s.exists){S.sync.s=canon(s.data());S.streak=cleanStreak(s.data());}
     else{S.sync.s='';S.streak=cleanStreak(ls);migS=!!S.streak.last;}
     S.date=todayKey();
@@ -792,7 +834,7 @@ function leave(){
   A.mode=null;
   if(editor.dataset.open==='true')closeEditor();
   lwrite(MKEY,'');
-  S.tasks=[];S.streak=cleanStreak(null);S.sync={t:'',s:''};
+  S.tasks=[];S.pending=[];S.streak=cleanStreak(null);S.sync={t:'',s:''};
   $('appView').hidden=true;$('welcome').hidden=false;
   renderWelcome();window.scrollTo(0,0);
 }
@@ -922,7 +964,105 @@ function updateNow(){
   nowEl.hidden=!today;
   if(today)nowEl.style.top='calc(var(--row) * '+(h+n.getMinutes()/60).toFixed(3)+')';
 }
-function render(){renderHead();renderWeek();renderGlance();renderCards();renderStreak();updateNow();}
+function render(){renderHead();renderWeek();renderGlance();renderCards();renderStreak();renderPlan();updateNow();}
+
+/* ---------- Organizador ---------- */
+/*PLAN-START*/
+const WIN_S=6,WIN_E=22,MAXRUN=3;
+/* Prioridad efectiva: una fecha límite cercana sube la prioridad. */
+function effPr(p,day){
+  if(!p.due)return p.pr;
+  const d=dayNum(p.due)-dayNum(day);
+  return d<=0?1:d<=2?Math.max(1,p.pr-1):p.pr;
+}
+/* Reparte las actividades sin hora en las horas libres del día.
+   1) Orden por prioridad efectiva, luego fecha límite, luego duración.
+   2) Dentro de la misma prioridad alterna académica y personal.
+   3) Nunca deja más de MAXRUN horas seguidas ocupadas: deja una hora libre de descanso.
+   4) Si no cabe de una vez, la parte en bloques de hasta 2 horas. */
+function planDay(pending,tasks,day,nowHour){
+  const busy=new Array(24).fill(false);
+  tasks.forEach(t=>{if(t.date===day)for(let h=t.start;h<t.end;h++)busy[h]=true;});
+  const from=nowHour==null?WIN_S:Math.max(WIN_S,nowHour+1);
+  const run=(h,step)=>{let n=0;while(h>=0&&h<24&&busy[h]){n++;h+=step;}return n;};
+  const fits=(s,d)=>{
+    for(let h=s;h<s+d;h++)if(busy[h])return false;
+    const b=run(s-1,-1),a=run(s+d,1);
+    return b+d+a<=MAXRUN||(!b&&!a);
+  };
+  const place=d=>{for(let s=from;s+d<=WIN_E;s++)if(fits(s,d))return s;return -1;};
+  const fill=(s,d)=>{for(let h=s;h<s+d;h++)busy[h]=true;};
+  const queue=pending.slice().sort((x,y)=>effPr(x,day)-effPr(y,day)||(x.due||'9999').localeCompare(y.due||'9999')||y.dur-x.dur);
+  const order=[];let last='';
+  while(queue.length){
+    const top=effPr(queue[0],day);
+    let i=queue.findIndex(p=>effPr(p,day)===top&&p.cat!==last);
+    if(i<0)i=0;
+    const p=queue.splice(i,1)[0];
+    order.push(p);last=p.cat;
+  }
+  const made=[],left=[];
+  const mk=(p,s,e,title)=>({id:uid(),date:day,start:s,end:e,title:title,notes:p.due?'Entrega: '+p.due:'',cat:p.cat,pr:p.pr,done:false,ex:false});
+  order.forEach(p=>{
+    const s=place(p.dur);
+    if(s>=0){fill(s,p.dur);made.push(mk(p,s,s+p.dur,p.title));return;}
+    const parts=[];let rem=p.dur;
+    while(rem>0){
+      let c=Math.min(2,rem),st=place(c);
+      if(st<0&&c>1){c=1;st=place(1);}
+      if(st<0)break;
+      fill(st,c);parts.push([st,st+c]);rem-=c;
+    }
+    parts.forEach((q,i)=>made.push(mk(p,q[0],q[1],parts.length>1?p.title+' ('+(i+1)+'/'+parts.length+')':p.title)));
+    if(rem>0)left.push(Object.assign({},p,{dur:rem}));
+  });
+  return {made:made,left:left};
+}
+/*PLAN-END*/
+const fShort=new Intl.DateTimeFormat('es-CO',{day:'numeric',month:'short'});
+function renderPlan(){
+  const ul=$('plist');ul.textContent='';
+  S.pending.forEach(p=>{
+    const li=document.createElement('li');
+    const dot=el('span','pdot','');dot.style.background='var(--p'+p.pr+')';
+    const tx=el('div','ptx','');
+    tx.appendChild(el('strong','',p.title));
+    tx.appendChild(el('span','muted small',p.dur+(p.dur===1?' hora':' horas')+' · '+PR[p.pr].n+' · '+CAT[p.cat]+(p.due?' · límite '+fShort.format(parse(p.due)):'')));
+    const x=el('button','btn icon small','×');x.type='button';x.dataset.id=p.id;x.setAttribute('aria-label','Quitar '+p.title);
+    li.appendChild(dot);li.appendChild(tx);li.appendChild(x);ul.appendChild(li);
+  });
+  const n=S.pending.length;
+  $('planNote').textContent=n?n+(n===1?' pendiente':' pendientes'):'';
+  $('orgBtn').disabled=!n;
+}
+function organize(){
+  const msg=$('orgMsg');
+  if(!S.pending.length){msg.textContent='Agrega primero lo que quieres hacer.';return;}
+  if(editor.dataset.open==='true')closeEditor();
+  const now=S.date===todayKey()?new Date().getHours():null;
+  const r=planDay(S.pending,S.tasks,S.date,now);
+  if(!r.made.length){msg.textContent='No hay horas libres entre las '+hh(WIN_S)+' y las '+hh(WIN_E)+' en este día. Prueba con otro día.';return;}
+  S.tasks=S.tasks.concat(r.made);S.pending=r.left;
+  save();render();
+  msg.textContent='Listo: puse '+r.made.length+(r.made.length===1?' bloque':' bloques')+' en este día.'+(r.left.length?' '+r.left.length+(r.left.length===1?' no cupo':' no cupieron')+'; cambia de día y vuelve a organizar.':'');
+  toast('Día organizado');
+}
+$('pf').addEventListener('submit',e=>{
+  e.preventDefault();
+  const title=$('pt').value.trim(),msg=$('orgMsg');
+  if(!title){msg.textContent='Escribe qué necesitas hacer.';$('pt').focus();return;}
+  if(S.pending.length>=40){msg.textContent='Ya tienes 40 pendientes. Organiza o quita algunos.';return;}
+  S.pending.push({id:uid(),title:title,dur:+$('pd').value,pr:+$('pp').value,cat:$('pc').value,due:$('pdue').value||''});
+  $('pt').value='';$('pdue').value='';msg.textContent='';
+  save();renderPlan();
+});
+$('plist').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-id]');
+  if(!b)return;
+  S.pending=S.pending.filter(p=>p.id!==b.dataset.id);
+  save();renderPlan();
+});
+$('orgBtn').addEventListener('click',organize);
 
 /* ---------- Selección manteniendo oprimido ---------- */
 function hourAt(y){

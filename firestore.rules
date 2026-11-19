@@ -5,8 +5,9 @@ service cloud.firestore {
     match /users/{uid}/data/planner {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['tasks'])
-        && request.resource.data.tasks is list;
+        && request.resource.data.keys().hasOnly(['tasks', 'pending'])
+        && request.resource.data.tasks is list
+        && (!('pending' in request.resource.data) || request.resource.data.pending is list);
     }
     match /users/{uid}/data/streak {
       allow read: if request.auth != null && request.auth.uid == uid;
